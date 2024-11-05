@@ -2,7 +2,12 @@ const db = require('../config/database');
 
 class Todo {
     static async getAll() {
-        const [rows] = await db.query('SELECT * FROM tarefas ORDER BY data_criacao DESC');
+        const [rows] = await db.query(`
+            SELECT t.*, u.nome as user_name 
+            FROM tarefas t 
+            LEFT JOIN usuarios u ON t.id_usuario = u.id_usuario 
+            ORDER BY t.data_criacao DESC
+        `);
         return rows;
     }
 
