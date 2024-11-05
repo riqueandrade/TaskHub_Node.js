@@ -38,11 +38,27 @@ class Todo {
     }
 
     static async updateStatus(id, status) {
-        const [result] = await db.query(
-            'UPDATE tarefas SET status = ? WHERE id_tarefas = ?',
-            [status, id]
-        );
-        return result.affectedRows > 0;
+        try {
+            const [result] = await db.query(
+                'UPDATE tarefas SET status = ? WHERE id_tarefas = ?',
+                [status, id]
+            );
+            
+            // Se a atualização foi bem sucedida, retorna os dados atualizados da tarefa
+            if (result.affectedRows > 0) {
+                const [updatedTask] = await db.query(`
+                    SELECT t.*, u.nome as user_name 
+                    FROM tarefas t 
+                    LEFT JOIN usuarios u ON t.id_usuario = u.id_usuario 
+                    WHERE t.id_tarefas = ?
+                `, [id]);
+                return updatedTask[0];
+            }
+            return null;
+        } catch (error) {
+            console.error('Erro ao atualizar status:', error);
+            throw error;
+        }
     }
 
     static async delete(id) {

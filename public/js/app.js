@@ -330,8 +330,22 @@ $(document).ready(function () {
             type: 'PATCH',
             data: JSON.stringify({ status: newStatus }),
             contentType: 'application/json',
-            success: function() {
-                updateTaskLists();
+            success: function(response) {
+                if (response.success) {
+                    // Remove a tarefa da coluna atual
+                    const taskElement = $(`.task-item[data-id="${taskId}"]`);
+                    taskElement.remove();
+                    
+                    // Adiciona a tarefa na nova coluna
+                    const newColumn = $(`.card:has(h2:contains("${newStatus}")) .task-list`);
+                    renderTask(newColumn, response.task);
+                    
+                    // Atualiza os contadores
+                    updateTaskCounters();
+                } else {
+                    console.error('Erro ao mover tarefa:', response.error);
+                    alert('Erro ao mover tarefa');
+                }
             },
             error: function(xhr, status, error) {
                 console.error('Erro ao mover tarefa:', error);
