@@ -51,9 +51,14 @@ const todoController = {
     async update(req, res) {
         try {
             const { id } = req.params;
-            const success = await Todo.update(id, req.body);
-            if (success) {
-                res.json({ message: 'Tarefa atualizada com sucesso' });
+            const updatedTask = await Todo.update(id, req.body);
+            
+            if (updatedTask) {
+                res.json({
+                    success: true,
+                    message: 'Tarefa atualizada com sucesso',
+                    task: updatedTask
+                });
             } else {
                 res.status(404).json({ error: 'Tarefa não encontrada' });
             }

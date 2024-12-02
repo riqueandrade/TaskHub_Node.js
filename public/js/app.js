@@ -95,15 +95,17 @@ $(document).ready(function () {
                 url: `/api/tasks?status=${encodeURIComponent(status)}`,
                 type: 'GET',
                 success: function(tasks) {
-                    const taskList = $(`.card:has(h2:contains("${status}")) .task-list`);
+                    const taskList = $(`.status-column:has(.status-title:contains("${status}")) .task-list`);
                     taskList.empty();
                     
                     tasks.forEach(task => {
-                        // Renderiza cada tarefa (mantenha sua lógica de renderização existente)
                         renderTask(taskList, task);
                     });
                     
                     updateTaskCounters();
+                },
+                error: function(xhr, status, error) {
+                    console.error('Erro ao carregar tarefas:', error);
                 }
             });
         });
@@ -111,11 +113,10 @@ $(document).ready(function () {
 
     // Função para atualizar os contadores de tarefas
     function updateTaskCounters() {
-        $('.card').each(function() {
-            const status = $(this).find('.card-header h2').text().trim();
-            // Conta apenas as tarefas visíveis em cada coluna
+        $('.status-column').each(function() {
+            const status = $(this).find('.status-title').text().trim();
             const taskCount = $(this).find('.task-list li:visible').length;
-            $(this).find('.task-counter').text(taskCount);
+            $(this).find('.status-count').text(taskCount);
         });
     }
 
@@ -144,10 +145,6 @@ $(document).ready(function () {
                             <span>${new Date(task.data_vencimento).toLocaleDateString('pt-BR')}</span>
                         </div>
                     ` : ''}
-                    
-                    <span class="todo-priority badge ${getPriorityClass(task.prioridade)}">
-                        ${task.prioridade.toUpperCase()}
-                    </span>
                 </div>
 
                 <div class="task-buttons">

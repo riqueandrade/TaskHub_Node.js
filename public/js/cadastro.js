@@ -8,6 +8,49 @@ $(document).ready(function () {
     // Lista original de usuários
     let originalUsers = [];
 
+    // Função para mostrar feedback
+    function showFeedback(success, message) {
+        const modalHtml = `
+            <div class="modal fade" id="feedbackModal" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title d-flex align-items-center gap-2">
+                                <i class="bi bi-info-circle"></i>
+                                <span id="modalTitle">${success ? 'Sucesso' : 'Erro'}</span>
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="d-flex align-items-center gap-3">
+                                <i class="bi ${success ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'} fs-1"></i>
+                                <p class="mb-0">${message}</p>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-${success ? 'primary' : 'danger'}" data-bs-dismiss="modal">OK</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove modal anterior se existir
+        $('#feedbackModal').remove();
+        
+        // Adiciona o novo modal ao body
+        $('body').append(modalHtml);
+        
+        // Inicializa e mostra o modal
+        const modal = new bootstrap.Modal(document.getElementById('feedbackModal'));
+        modal.show();
+        
+        // Remove o modal do DOM quando ele for fechado
+        $('#feedbackModal').on('hidden.bs.modal', function () {
+            $(this).remove();
+        });
+    }
+
     // Função para carregar estatísticas
     function loadStats() {
         $.ajax({
@@ -17,6 +60,10 @@ $(document).ready(function () {
                 $('#totalUsers').text(response.total_users);
                 $('#activeUsers').text(response.active_users);
                 $('#assignedTasks').text(response.assigned_tasks);
+            },
+            error: function (xhr, status, error) {
+                console.error('Erro ao carregar estatísticas:', error);
+                showFeedback(false, 'Erro ao carregar estatísticas');
             }
         });
     }
@@ -304,15 +351,14 @@ $(document).ready(function () {
                 url: '/api/users/' + id,
                 type: 'DELETE',
                 success: function (response) {
-                    var result = JSON.parse(response);
                     feedbackModal.hide();
 
-                    if (result.success) {
+                    if (response.success) {
                         showFeedback(true, 'Usuário excluído com sucesso!');
                         loadUsers();
                         loadStats();
                     } else {
-                        showFeedback(false, 'Erro ao excluir: ' + result.error);
+                        showFeedback(false, 'Erro ao excluir: ' + response.error);
                     }
                 },
                 error: function (xhr, status, error) {
@@ -323,59 +369,58 @@ $(document).ready(function () {
         };
     }
 
-    // Função para mostrar feedback
-    function showFeedback(success, message) {
-        const modal = document.getElementById('feedbackModal');
-        const modalTitle = modal.querySelector('#modalTitle');
-        const modalMessage = modal.querySelector('#modalMessage');
-        const modalIcon = modal.querySelector('#modalIcon');
-
-        modalTitle.textContent = success ? 'Sucesso' : 'Erro';
-        modalMessage.textContent = message;
-        modalIcon.className = success ?
-            'bi bi-check-circle-fill text-success me-3 fs-1' :
-            'bi bi-x-circle-fill text-danger me-3 fs-1';
-
-        const modalFooter = modal.querySelector('.modal-footer');
-        modalFooter.innerHTML = `
-            <button type="button" class="btn btn-${success ? 'primary' : 'danger'}" data-bs-dismiss="modal">OK</button>
-        `;
-
-        const feedbackModal = new bootstrap.Modal(modal);
-        feedbackModal.show();
-    }
-
     // Manipula o envio do formulário
     $('#user-form').submit(function (e) {
         e.preventDefault();
 
-        let formData = $(this).serialize();
-        if (editingId) {
-            formData += '&action=update&id=' + editingId;
-        } else {
-            formData += '&action=add';
+        const formData = {
+            nome: $('#nome').val().trim(),
+            email: $('#email').val().trim()
+        };
+
+        // Validação básica
+        if (!formData.nome || !formData.email) {
+            showFeedback(false, 'Por favor, preencha todos os campos');
+            return;
         }
 
+        // Validação de email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.email)) {
+            showFeedback(false, 'Por favor, insira um email válido');
+            return;
+        }
+
+        const url = editingId ? `/api/users/${editingId}` : '/api/users';
+        const method = editingId ? 'PUT' : 'POST';
+
         $.ajax({
-            url: '/api/users',
-            type: 'POST',
-            data: formData,
+            url: url,
+            type: method,
+            data: JSON.stringify(formData),
+            contentType: 'application/json',
             success: function (response) {
-                var result = JSON.parse(response);
-                if (result.success) {
-                    showFeedback(true, editingId ? 'Usuário atualizado com sucesso!' : 'Usuário cadastrado com sucesso!');
+                if (response.success) {
+                    showFeedback(true, response.message);
                     $('#user-form')[0].reset();
                     editingId = null;
                     $('button[type="submit"]').text('Cadastrar');
-                    $('.card-header h1').text('Cadastro de Usuário');
+                    $('.card-header h2').text('Novo Usuário');
                     loadUsers();
                     loadStats();
                 } else {
-                    showFeedback(false, 'Erro: ' + result.error);
+                    showFeedback(false, response.error || 'Erro ao processar operação');
                 }
             },
             error: function (xhr, status, error) {
-                showFeedback(false, 'Erro ao realizar operação');
+                let errorMessage = 'Erro ao processar operação';
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    errorMessage = response.error || errorMessage;
+                } catch (e) {
+                    console.error('Erro ao processar resposta:', e);
+                }
+                showFeedback(false, errorMessage);
             }
         });
     });
@@ -534,86 +579,80 @@ $(document).ready(function () {
         });
     });
 
-    // Adicionar após as funções existentes
+    // Função para visualizar perfil do usuário
     function viewUserProfile(userId) {
-        // Busca os dados do usuário e suas tarefas
         $.ajax({
             url: '/api/users/' + userId,
             type: 'GET',
             success: function (response) {
-                try {
-                    const data = JSON.parse(response);
+                // Preenche as informações do usuário
+                $('#profileName').text(response.user.nome);
+                $('#profileEmail').text(response.user.email);
+                $('#profileDate').text(new Date(response.user.data_cadastro).toLocaleDateString('pt-BR'));
 
-                    // Preenche as informações do usuário
-                    $('#profileName').text(data.user.nome);
-                    $('#profileEmail').text(data.user.email);
-                    $('#profileDate').text(new Date(data.user.data_cadastro).toLocaleDateString('pt-BR'));
+                // Limpa e preenche a lista de tarefas
+                const tasksList = $('#userTasksList');
+                tasksList.empty();
 
-                    // Limpa e preenche a lista de tarefas
-                    const tasksList = $('#userTasksList');
-                    tasksList.empty();
+                if (response.tasks.length > 0) {
+                    response.tasks.forEach(task => {
+                        // Define a cor baseada na prioridade
+                        let priorityClass = '';
+                        switch (task.prioridade) {
+                            case 'alta':
+                                priorityClass = 'text-danger';
+                                break;
+                            case 'media':
+                                priorityClass = 'text-warning';
+                                break;
+                            case 'baixa':
+                                priorityClass = 'text-success';
+                                break;
+                        }
 
-                    if (data.tasks.length > 0) {
-                        data.tasks.forEach(task => {
-                            // Define a cor baseada na prioridade
-                            let priorityClass = '';
-                            switch (task.prioridade) {
-                                case 'alta':
-                                    priorityClass = 'text-danger';
-                                    break;
-                                case 'media':
-                                    priorityClass = 'text-warning';
-                                    break;
-                                case 'baixa':
-                                    priorityClass = 'text-success';
-                                    break;
-                            }
-
-                            // Cria o elemento da tarefa
-                            tasksList.append(`
-                                <div class="list-group-item">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <h6 class="mb-1">${task.tarefa}</h6>
-                                            <p class="mb-1 small text-muted">
-                                                <i class="bi bi-folder me-1"></i> ${task.setor || 'Sem setor'}
+                        // Cria o elemento da tarefa
+                        tasksList.append(`
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">${task.tarefa}</h6>
+                                        <p class="mb-1 small text-muted">
+                                            <i class="bi bi-folder me-1"></i> ${task.setor || 'Sem setor'}
+                                        </p>
+                                        ${task.data_vencimento ? `
+                                            <p class="mb-0 small text-muted">
+                                                <i class="bi bi-calendar-event me-1"></i>
+                                                Vence em: ${new Date(task.data_vencimento).toLocaleDateString('pt-BR')}
                                             </p>
-                                            ${task.data_vencimento ? `
-                                                <p class="mb-0 small text-muted">
-                                                    <i class="bi bi-calendar-event me-1"></i>
-                                                    Vence em: ${new Date(task.data_vencimento).toLocaleDateString('pt-BR')}
-                                                </p>
-                                            ` : ''}
-                                        </div>
-                                        <div class="d-flex flex-column align-items-end">
-                                            <span class="badge ${priorityClass} mb-2">
-                                                ${task.prioridade.toUpperCase()}
-                                            </span>
-                                            <span class="badge bg-secondary">
-                                                ${task.status}
-                                            </span>
-                                        </div>
+                                        ` : ''}
+                                    </div>
+                                    <div class="d-flex flex-column align-items-end">
+                                        <span class="badge ${priorityClass} mb-2">
+                                            ${task.prioridade.toUpperCase()}
+                                        </span>
+                                        <span class="badge bg-secondary">
+                                            ${task.status}
+                                        </span>
                                     </div>
                                 </div>
-                            `);
-                        });
-                    } else {
-                        tasksList.append(`
-                            <div class="text-center text-muted py-3">
-                                <i class="bi bi-inbox fs-4 d-block mb-2"></i>
-                                Nenhuma tarefa atribuída
                             </div>
                         `);
-                    }
-
-                    // Abre o modal
-                    new bootstrap.Modal(document.getElementById('userProfileModal')).show();
-                } catch (e) {
-                    console.error('Erro ao processar dados:', e);
+                    });
+                } else {
+                    tasksList.append(`
+                        <div class="text-center text-muted py-3">
+                            <i class="bi bi-inbox fs-4 d-block mb-2"></i>
+                            Nenhuma tarefa atribuída
+                        </div>
+                    `);
                 }
+
+                // Abre o modal
+                new bootstrap.Modal(document.getElementById('userProfileModal')).show();
             },
             error: function (xhr, status, error) {
                 console.error('Erro ao carregar perfil:', error);
+                showFeedback(false, 'Erro ao carregar perfil do usuário');
             }
         });
     }

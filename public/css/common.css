@@ -154,11 +154,6 @@ body {
     overflow: hidden;
 }
 
-.card:hover {
-    box-shadow: var(--sombra-media);
-    transform: translateY(-2px);
-}
-
 .card-header {
     padding: var(--espacamento-m);
     border-bottom: 1px solid var(--cor-cinza-200);
