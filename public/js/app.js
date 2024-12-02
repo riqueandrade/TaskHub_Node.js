@@ -218,7 +218,7 @@ $(document).ready(function () {
                 
                 if (response && response.length > 0) {
                     // Atualiza o badge
-                    notificationBadge.removeClass('d-none').text(response.length);
+                    notificationBadge.text(response.length).removeClass('d-none');
                     noNotifications.addClass('d-none');
 
                     // Ordena as notificações por proximidade da data de vencimento
@@ -273,12 +273,13 @@ $(document).ready(function () {
                         `);
                     });
                 } else {
-                    notificationBadge.addClass('d-none').text('0');
+                    notificationBadge.text('0').addClass('d-none');
                     noNotifications.removeClass('d-none');
                 }
             },
             error: function(xhr, status, error) {
                 console.error('Erro ao carregar notificações:', error);
+                notificationBadge.text('!').removeClass('d-none');
             }
         });
     }
@@ -469,7 +470,8 @@ $(document).ready(function () {
     $('#exportExcelBtn').on('click', exportToExcel);
 
     // Inicializar modal de notificações
-    $('#notificationDropdown').on('click', function() {
+    $('#notificationDropdown').on('click', function(e) {
+        e.preventDefault();
         const notificationModal = new bootstrap.Modal(document.getElementById('notificationModal'));
         notificationModal.show();
     });
