@@ -216,33 +216,69 @@ $(document).ready(function () {
                 
                 notificationList.empty();
                 
-                if (response.length > 0) {
+                if (response && response.length > 0) {
+                    // Atualiza o badge
+                    notificationBadge.removeClass('d-none').text(response.length);
+                    noNotifications.addClass('d-none');
+
+                    // Ordena as notificações por proximidade da data de vencimento
+                    response.sort((a, b) => new Date(a.data_vencimento) - new Date(b.data_vencimento));
+
                     response.forEach(function (notif) {
+                        const dueDate = new Date(notif.data_vencimento);
+                        const today = new Date();
+                        const diffTime = dueDate - today;
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        
+                        let dateClass = '';
+                        let dateText = '';
+                        
+                        if (diffDays < 0) {
+                            dateClass = 'urgent';
+                            dateText = 'Atrasada';
+                        } else if (diffDays === 0) {
+                            dateClass = 'urgent';
+                            dateText = 'Vence hoje';
+                        } else if (diffDays === 1) {
+                            dateClass = 'warning';
+                            dateText = 'Vence amanhã';
+                        } else {
+                            dateClass = 'warning';
+                            dateText = `Vence em ${diffDays} dias`;
+                        }
+
                         notificationList.append(`
                             <div class="list-group-item">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="mb-1">${notif.tarefa}</h6>
-                                        <p class="mb-0 text-muted small">
-                                            <i class="bi bi-person-fill me-1"></i>
-                                            ${notif.user_name || "Não atribuído"}
-                                        </p>
+                                <div class="notification-content">
+                                    <div class="notification-info">
+                                        <h6>${notif.tarefa}</h6>
+                                        <div class="notification-meta">
+                                            <div class="notification-user">
+                                                <i class="bi bi-person"></i>
+                                                <span>${notif.user_name || "Não atribuído"}</span>
+                                            </div>
+                                            ${notif.setor ? `
+                                                <div class="notification-sector">
+                                                    <i class="bi bi-building"></i>
+                                                    <span>${notif.setor}</span>
+                                                </div>
+                                            ` : ''}
+                                        </div>
                                     </div>
-                                    <span class="badge bg-warning text-dark">
-                                        <i class="bi bi-calendar-event me-1"></i>
-                                        ${new Date(notif.data_vencimento).toLocaleDateString('pt-BR')}
-                                    </span>
+                                    <div class="notification-date ${dateClass}">
+                                        ${dateText}
+                                    </div>
                                 </div>
                             </div>
                         `);
                     });
-                    
-                    notificationBadge.removeClass('d-none').text(response.length);
-                    noNotifications.addClass('d-none');
                 } else {
-                    notificationBadge.addClass('d-none');
+                    notificationBadge.addClass('d-none').text('0');
                     noNotifications.removeClass('d-none');
                 }
+            },
+            error: function(xhr, status, error) {
+                console.error('Erro ao carregar notificações:', error);
             }
         });
     }
@@ -431,6 +467,12 @@ $(document).ready(function () {
     // Event listeners para os botões de exportação
     $('#exportPDFBtn').on('click', exportToPDF);
     $('#exportExcelBtn').on('click', exportToExcel);
+
+    // Inicializar modal de notificações
+    $('#notificationDropdown').on('click', function() {
+        const notificationModal = new bootstrap.Modal(document.getElementById('notificationModal'));
+        notificationModal.show();
+    });
 });
 
 // Funções de exportação no escopo global
