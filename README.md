@@ -11,12 +11,22 @@
 ---
 
 ## 📋 Sumário
-- [Visão Geral](#-visão-geral)
-- [Funcionalidades](#-funcionalidades)
-- [Tecnologias](#-tecnologias)
-- [Estrutura](#-estrutura)
-- [Instalação](#-instalação)
-- [Uso](#-uso)
+- [📋 Sumário](#-sumário)
+- [🎯 Visão Geral](#-visão-geral)
+- [🚀 Funcionalidades](#-funcionalidades)
+  - [Dashboard de Usuários](#dashboard-de-usuários)
+  - [Quadro Kanban](#quadro-kanban)
+  - [Sistema de Tarefas](#sistema-de-tarefas)
+- [💻 Tecnologias](#-tecnologias)
+  - [Frontend](#frontend)
+  - [Backend](#backend)
+- [🏗 Estrutura](#-estrutura)
+- [📦 Instalação](#-instalação)
+- [📖 Uso](#-uso)
+  - [Gestão de Usuários](#gestão-de-usuários)
+  - [Gestão de Tarefas](#gestão-de-tarefas)
+- [📄 Licença](#-licença)
+- [🤝 Suporte](#-suporte)
 
 ## 🎯 Visão Geral
 
@@ -48,13 +58,17 @@ TaskHub é um sistema web para gerenciamento de tarefas e usuários, com interfa
   - Prioridade (Alta, Média, Baixa)
   - Responsável
   - Data de vencimento
-- Notificações de prazos
+- Notificações de prazos e contador em tempo real
 - Contadores por status
 - Sistema de filtros:
   - 🔍 Busca por texto
   - 🏷️ Filtro por prioridade
   - 👤 Filtro por responsável
   - 🏢 Filtro por setor
+- Exportação em múltiplos formatos:
+  - 📊 Excel (.xlsx)
+  - 📄 PDF
+  - 📁 ZIP (pacote com múltiplos formatos)
 
 ## 💻 Tecnologias
 
