@@ -468,6 +468,7 @@ $(document).ready(function () {
     // Event listeners para os botões de exportação
     $('#exportPDFBtn').on('click', exportToPDF);
     $('#exportExcelBtn').on('click', exportToExcel);
+    $('#exportZipBtn').on('click', exportToZip);
 
     // Inicializar modal de notificações
     $('#notificationDropdown').on('click', function(e) {
@@ -714,4 +715,127 @@ function exportToExcel() {
             alert('Erro ao exportar para Excel');
         }
     });
+}
+
+async function exportToZip() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('exportModal'));
+    modal.hide();
+
+    try {
+        // Busca as tarefas
+        const tasks = await $.ajax({
+            url: '/api/tasks',
+            type: 'GET'
+        });
+
+        // Cria um novo objeto ZIP
+        const zip = new JSZip();
+
+        // Gera o PDF
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'mm', 'a4');
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 15;
+        const effectiveWidth = pageWidth - (2 * margin);
+
+        // Adiciona cabeçalho do PDF
+        doc.setFontSize(16);
+        doc.setTextColor(74, 144, 226);
+        doc.text("TaskHub - Relatório de Tarefas", margin, margin + 5);
+
+        // Adiciona data do relatório no PDF
+        doc.setFontSize(10);
+        doc.setTextColor(108, 117, 125);
+        doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, margin, margin + 12);
+
+        // Configuração da tabela PDF
+        doc.autoTable({
+            startY: margin + 20,
+            margin: { left: margin, right: margin },
+            headStyles: { 
+                fillColor: [74, 144, 226],
+                textColor: [255, 255, 255],
+                fontSize: 10,
+                fontStyle: 'bold',
+                halign: 'left',
+                cellPadding: 4
+            },
+            head: [["Tarefa", "Setor", "Prioridade", "Status", "Responsável", "Vencimento"]],
+            body: tasks.map(task => [
+                task.tarefa,
+                task.setor || 'N/A',
+                task.prioridade.toUpperCase(),
+                task.status,
+                task.user_name || 'Não atribuído',
+                task.data_vencimento ? new Date(task.data_vencimento).toLocaleDateString('pt-BR') : 'N/A'
+            ])
+        });
+
+        // Adiciona o PDF ao ZIP
+        const pdfBlob = doc.output('blob');
+        zip.file("TaskHub_Tarefas.pdf", pdfBlob);
+
+        // Gera o Excel
+        let excelContent = '<?xml version="1.0" encoding="UTF-8"?>\n';
+        excelContent += '<?mso-application progid="Excel.Sheet"?>\n';
+        excelContent += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\n';
+        excelContent += '    xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n';
+        
+        // Adiciona estilos do Excel
+        excelContent += '<Styles>\n';
+        excelContent += `
+            <Style ss:ID="Header">
+                <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+                <Font ss:Bold="1" ss:Size="12" ss:Color="#FFFFFF"/>
+                <Interior ss:Color="#4A90E2" ss:Pattern="Solid"/>
+            </Style>
+            <Style ss:ID="Normal">
+                <Alignment ss:Vertical="Center"/>
+                <Font ss:Size="10"/>
+            </Style>
+        `;
+        excelContent += '</Styles>\n';
+
+        // Adiciona a planilha
+        excelContent += '<Worksheet ss:Name="Tarefas">\n';
+        excelContent += '<Table>\n';
+
+        // Cabeçalhos do Excel
+        excelContent += '<Row>\n';
+        ["Tarefa", "Setor", "Prioridade", "Status", "Responsável", "Vencimento"].forEach(header => {
+            excelContent += `<Cell ss:StyleID="Header"><Data ss:Type="String">${header}</Data></Cell>\n`;
+        });
+        excelContent += '</Row>\n';
+
+        // Dados do Excel
+        tasks.forEach(task => {
+            excelContent += '<Row>\n';
+            excelContent += `<Cell ss:StyleID="Normal"><Data ss:Type="String">${task.tarefa}</Data></Cell>\n`;
+            excelContent += `<Cell ss:StyleID="Normal"><Data ss:Type="String">${task.setor || 'N/A'}</Data></Cell>\n`;
+            excelContent += `<Cell ss:StyleID="Normal"><Data ss:Type="String">${task.prioridade.toUpperCase()}</Data></Cell>\n`;
+            excelContent += `<Cell ss:StyleID="Normal"><Data ss:Type="String">${task.status}</Data></Cell>\n`;
+            excelContent += `<Cell ss:StyleID="Normal"><Data ss:Type="String">${task.user_name || 'Não atribuído'}</Data></Cell>\n`;
+            excelContent += `<Cell ss:StyleID="Normal"><Data ss:Type="String">${task.data_vencimento ? new Date(task.data_vencimento).toLocaleDateString('pt-BR') : 'N/A'}</Data></Cell>\n`;
+            excelContent += '</Row>\n';
+        });
+
+        excelContent += '</Table>\n</Worksheet>\n</Workbook>';
+
+        // Adiciona o Excel ao ZIP
+        zip.file("TaskHub_Tarefas.xls", excelContent);
+
+        // Gera o arquivo ZIP
+        const zipBlob = await zip.generateAsync({type: "blob"});
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(zipBlob);
+        link.download = 'TaskHub_Tarefas.zip';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+    } catch (error) {
+        console.error('Erro ao exportar para ZIP:', error);
+        alert('Erro ao gerar o arquivo ZIP');
+    }
 }
