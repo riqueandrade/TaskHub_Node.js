@@ -444,25 +444,32 @@ function exportToPDF() {
         success: function(tasks) {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('l', 'mm', 'a4'); // Orientação paisagem
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const margin = 15;
+            const effectiveWidth = pageWidth - (2 * margin);
 
             // Adiciona cabeçalho
-            doc.setFontSize(20);
+            doc.setFontSize(16);
             doc.setTextColor(74, 144, 226);
-            doc.text("TaskHub - Relatório de Tarefas", 14, 20);
+            doc.text("TaskHub - Relatório de Tarefas", margin, margin + 5);
 
             // Adiciona data do relatório
             doc.setFontSize(10);
             doc.setTextColor(108, 117, 125);
-            doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, 30);
+            doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, margin, margin + 12);
 
             // Configuração da tabela
             doc.autoTable({
-                startY: 40,
+                startY: margin + 20,
+                margin: { left: margin, right: margin },
                 headStyles: { 
                     fillColor: [74, 144, 226],
+                    textColor: [255, 255, 255],
                     fontSize: 10,
                     fontStyle: 'bold',
-                    halign: 'center'
+                    halign: 'left',
+                    cellPadding: 4
                 },
                 head: [["Tarefa", "Setor", "Prioridade", "Status", "Responsável", "Vencimento"]],
                 body: tasks.map(task => [
@@ -473,20 +480,54 @@ function exportToPDF() {
                     task.user_name || 'Não atribuído',
                     task.data_vencimento ? new Date(task.data_vencimento).toLocaleDateString('pt-BR') : 'N/A'
                 ]),
-                styles: { 
-                    fontSize: 9,
-                    cellPadding: 5
-                },
                 columnStyles: {
-                    0: { cellWidth: 70 }, // Tarefa
-                    1: { cellWidth: 40 }, // Setor
-                    2: { cellWidth: 25, halign: 'center' }, // Prioridade
-                    3: { cellWidth: 25, halign: 'center' }, // Status
-                    4: { cellWidth: 45 }, // Responsável
-                    5: { cellWidth: 30, halign: 'center' } // Vencimento
+                    0: { cellWidth: effectiveWidth * 0.30 }, // Tarefa (30%)
+                    1: { cellWidth: effectiveWidth * 0.15 }, // Setor (15%)
+                    2: { cellWidth: effectiveWidth * 0.12 }, // Prioridade (12%)
+                    3: { cellWidth: effectiveWidth * 0.13 }, // Status (13%)
+                    4: { cellWidth: effectiveWidth * 0.18 }, // Responsável (18%)
+                    5: { cellWidth: effectiveWidth * 0.12 }  // Vencimento (12%)
+                },
+                styles: {
+                    fontSize: 9,
+                    cellPadding: 3,
+                    overflow: 'linebreak',
+                    font: 'helvetica',
+                    halign: 'left'
+                },
+                bodyStyles: {
+                    textColor: [68, 68, 68]
                 },
                 alternateRowStyles: {
-                    fillColor: [245, 247, 250]
+                    fillColor: [249, 250, 251]
+                },
+                didDrawPage: function(data) {
+                    // Adiciona rodapé com número da página
+                    doc.setFontSize(8);
+                    doc.setTextColor(108, 117, 125);
+                    doc.text(
+                        `Página ${data.pageNumber}`,
+                        margin,
+                        pageHeight - 10
+                    );
+                },
+                willDrawCell: function(data) {
+                    // Formatação condicional para datas
+                    if (data.column.index === 5 && data.row.section === 'body') {
+                        const dateStr = data.cell.text;
+                        if (dateStr !== 'N/A') {
+                            const dueDate = new Date(tasks[data.row.index].data_vencimento);
+                            const today = new Date();
+                            const diffTime = dueDate - today;
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                            if (diffDays < 0) {
+                                data.cell.styles.textColor = [220, 53, 69]; // Vermelho para atrasadas
+                            } else if (diffDays <= 3) {
+                                data.cell.styles.textColor = [255, 165, 0]; // Laranja para próximas
+                            }
+                        }
+                    }
                 }
             });
 
@@ -531,12 +572,40 @@ function exportToExcel() {
                     <Font ss:Size="10" ss:Color="#6C757D"/>
                     <Alignment ss:Horizontal="Left"/>
                 </Style>
+                <Style ss:ID="Normal">
+                    <Alignment ss:Vertical="Center"/>
+                    <Font ss:Size="10"/>
+                </Style>
+                <Style ss:ID="Warning">
+                    <Alignment ss:Vertical="Center"/>
+                    <Font ss:Size="10" ss:Color="#FFA500"/>
+                    <Interior ss:Color="#FFF3CD" ss:Pattern="Solid"/>
+                </Style>
+                <Style ss:ID="Danger">
+                    <Alignment ss:Vertical="Center"/>
+                    <Font ss:Size="10" ss:Color="#DC3545"/>
+                    <Interior ss:Color="#FFE9E9" ss:Pattern="Solid"/>
+                </Style>
+                <Style ss:ID="Success">
+                    <Alignment ss:Vertical="Center"/>
+                    <Font ss:Size="10" ss:Color="#28A745"/>
+                </Style>
             `;
             excelContent += '</Styles>\n';
 
             // Adiciona a planilha
             excelContent += '<Worksheet ss:Name="Tarefas">\n';
             excelContent += '<Table>\n';
+
+            // Ajusta larguras das colunas
+            excelContent += `
+                <Column ss:Width="300"/>
+                <Column ss:Width="150"/>
+                <Column ss:Width="100"/>
+                <Column ss:Width="100"/>
+                <Column ss:Width="200"/>
+                <Column ss:Width="120"/>
+            `;
 
             // Título e Data
             excelContent += `
@@ -560,13 +629,29 @@ function exportToExcel() {
 
             // Dados
             tasks.forEach(task => {
+                let dueDateStyle = "Normal";
+                if (task.data_vencimento) {
+                    const dueDate = new Date(task.data_vencimento);
+                    const today = new Date();
+                    const diffTime = dueDate - today;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    if (diffDays < 0) {
+                        dueDateStyle = "Danger"; // Atrasado
+                    } else if (diffDays <= 3) {
+                        dueDateStyle = "Warning"; // Próximo ao vencimento
+                    } else if (task.status === 'Pronto') {
+                        dueDateStyle = "Success"; // Concluído
+                    }
+                }
+
                 excelContent += '<Row>\n';
-                excelContent += `<Cell><Data ss:Type="String">${task.tarefa}</Data></Cell>\n`;
-                excelContent += `<Cell><Data ss:Type="String">${task.setor || 'N/A'}</Data></Cell>\n`;
-                excelContent += `<Cell><Data ss:Type="String">${task.prioridade.toUpperCase()}</Data></Cell>\n`;
-                excelContent += `<Cell><Data ss:Type="String">${task.status}</Data></Cell>\n`;
-                excelContent += `<Cell><Data ss:Type="String">${task.user_name || 'Não atribuído'}</Data></Cell>\n`;
-                excelContent += `<Cell><Data ss:Type="String">${task.data_vencimento ? new Date(task.data_vencimento).toLocaleDateString('pt-BR') : 'N/A'}</Data></Cell>\n`;
+                excelContent += `<Cell ss:StyleID="Normal"><Data ss:Type="String">${task.tarefa}</Data></Cell>\n`;
+                excelContent += `<Cell ss:StyleID="Normal"><Data ss:Type="String">${task.setor || 'N/A'}</Data></Cell>\n`;
+                excelContent += `<Cell ss:StyleID="Normal"><Data ss:Type="String">${task.prioridade.toUpperCase()}</Data></Cell>\n`;
+                excelContent += `<Cell ss:StyleID="Normal"><Data ss:Type="String">${task.status}</Data></Cell>\n`;
+                excelContent += `<Cell ss:StyleID="Normal"><Data ss:Type="String">${task.user_name || 'Não atribuído'}</Data></Cell>\n`;
+                excelContent += `<Cell ss:StyleID="${dueDateStyle}"><Data ss:Type="String">${task.data_vencimento ? new Date(task.data_vencimento).toLocaleDateString('pt-BR') : 'N/A'}</Data></Cell>\n`;
                 excelContent += '</Row>\n';
             });
 
