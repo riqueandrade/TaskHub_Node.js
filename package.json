@@ -1,16 +1,19 @@
 {
   "name": "todo-list-fullstack",
   "version": "1.0.0",
-  "description": "ToDo List application with Express and REST API",
+  "description": "ToDo List application with Express, MySQL and REST API",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "db:setup": "node scripts/setupDb.js"
   },
   "dependencies": {
     "express": "^4.18.2",
+    "mysql2": "^3.6.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "mysql-import": "^5.0.26"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
